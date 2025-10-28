@@ -1,0 +1,103 @@
+import React, { useState } from "react";
+
+// Wheel Predictor - React single-file component // اللغة: العربية // طريقة العمل: ادخال ΔN01, ΔN12 (خانات في كل ثانية) و current slot // يحسب v1,v2,a, الوقت المتبقي حتى 6s، D ثم يعرض التوقع الرئيسي واحتمال بديل
+
+export default function WheelPredictor() { const [t0, setT0] = useState(0); // مفترض 0 const [t1, setT1] = useState(1); // بالثواني (عادة 1) const [t2, setT2] = useState(2); // بالثواني (عادة 2) const [dN01, setDN01] = useState(0); const [dN12, setDN12] = useState(0); const [currentSlot, setCurrentSlot] = useState(0); const [result, setResult] = useState(null);
+
+function mod8(n) { const v = ((Math.round(n) % 8) + 8) % 8; return v; }
+
+function calculate() { // ضمان أن القيم رقمية const n0 = Number(dN01); const n1 = Number(dN12); const tt0 = Number(t0); const tt1 = Number(t1); const tt2 = Number(t2); const cs = Number(currentSlot) || 0;
+
+// سرعات (خانات/ث)
+const v1 = n0 / Math.max(1e-6, (tt1 - tt0));
+const v2 = n1 / Math.max(1e-6, (tt2 - tt1));
+const a = v2 - v1; // تقريبي
+
+// زمن القياس الأخير و الوقت المتبقي حتى 6s
+const tMeas = tt2;
+const Trem = Math.max(0, 6.0 - (tMeas - tt0)); // 6s منذ بداية الدوران
+
+// المسافة المتوقعة (خانات)
+const D = v2 * Trem + 0.5 * a * Trem * Trem;
+
+// نحسب أفضل خانة وبديل لو D قريب من .5
+const raw = cs + D;
+const main = mod8(Math.round(raw));
+
+// نفحص احتمال ثاني (floor أو ceil) بناءً على قرب الكسور
+const frac = raw - Math.floor(raw);
+let alt = null;
+if (Math.abs(frac - 0.5) < 0.35) {
+  // لو قريب للنص، نعطي احتمالين
+  alt = mod8(Math.floor(raw));
+} else if (Math.abs(frac) < 0.25) {
+  alt = mod8(Math.floor(raw));
+} else if (Math.abs(frac - 1) < 0.25) {
+  alt = mod8(Math.ceil(raw));
+}
+
+setResult({ v1, v2, a, Trem, D, raw, main, alt });
+
+}
+
+function reset() { setDN01(0); setDN12(0); setCurrentSlot(0); setResult(null); }
+
+return ( <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-white p-4"> <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-6"> <h1 className="text-2xl font-bold mb-3 text-center">تطبيق توقع العجلة</h1> <p className="text-sm text-gray-600 mb-4">ادخل عدد الخانات التي قطعت في كل ثانية (ΔN01 و ΔN12) وخانة المؤشر الحالية. التطبيق يحسب التوقع الرئيسي واحتمال بديل إن لزم.</p>
+
+<div className="space-y-3">
+      <div>
+        <label className="block text-sm">t0 (بداية الدوران، عادة 0s)</label>
+        <input type="number" value={t0} onChange={e=>setT0(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+      <div>
+        <label className="block text-sm">t1 (القياس الأول، بالثواني، عادة 1)</label>
+        <input type="number" value={t1} onChange={e=>setT1(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+      <div>
+        <label className="block text-sm">t2 (القياس الثاني، بالثواني، عادة 2)</label>
+        <input type="number" value={t2} onChange={e=>setT2(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+
+      <div>
+        <label className="block text-sm">ΔN01 — عدد الخانات من t0 إلى t1</label>
+        <input type="number" value={dN01} onChange={e=>setDN01(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+
+      <div>
+        <label className="block text-sm">ΔN12 — عدد الخانات من t1 إلى t2</label>
+        <input type="number" value={dN12} onChange={e=>setDN12(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+
+      <div>
+        <label className="block text-sm">الخانة الحالية (0..7)</label>
+        <input type="number" min={0} max={7} value={currentSlot} onChange={e=>setCurrentSlot(e.target.value)} className="w-full mt-1 p-2 border rounded" />
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={calculate} className="flex-1 py-2 rounded bg-indigo-600 text-white font-medium">احسب التوقع</button>
+        <button onClick={reset} className="py-2 px-4 rounded border">مسح</button>
+      </div>
+
+      {result && (
+        <div className="mt-4 p-3 rounded bg-gray-50 border">
+          <h2 className="font-semibold">النتيجة</h2>
+          <p>v₁ = {result.v1.toFixed(2)} خانات/ث</p>
+          <p>v₂ = {result.v2.toFixed(2)} خانات/ث</p>
+          <p>a = {result.a.toFixed(2)} خانات/ث²</p>
+          <p>الوقت المتبقي حتى 6s = {result.Trem.toFixed(2)} ث</p>
+          <p>المسافة D = {result.D.toFixed(2)} خانات</p>
+          <p className="mt-2 font-bold">التوقع الرئيسي: خانة {result.main}</p>
+          {result.alt !== null && (<p className="text-sm text-gray-700">احتمال بديل: خانة {result.alt}</p>)}
+
+          <div className="mt-3 text-xs text-gray-600">
+            <p>نصيحة: استعمل تصوير slow-mo أو قم بقراءة ΔN بدقّة في كل ثانية للحصول على نتائج أكثر دقّة.</p>
+          </div>
+        </div>
+      )}
+
+    </div>
+  </div>
+</div>
+
+); }
+
