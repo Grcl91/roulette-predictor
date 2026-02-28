@@ -1,34 +1,14 @@
 import os
-import subprocess
-import sys
+from github import Github
 
-# Configuration
-REPO_URL = 'https://github.com/Grcl91/roulette-predictor'
-BRANCH_NAME = 'master'
+# Initialize using an access token
+access_token = os.getenv('GITHUB_ACCESS_TOKEN')
+g = Github(access_token)
 
-def fork_repo():
-    # This requires GitHub CLI to be installed and authenticated
-    subprocess.run(['gh', 'repo', 'fork', REPO_URL], check=True)
+# Example of getting a repository
+repo = g.get_repo('owner/repo_name')
 
-def clone_repo():
-    # Clone the forked repository
-    forked_url = f'https://github.com/Grcl91/roulette-predictor.git'
-    subprocess.run(['git', 'clone', forked_url], check=True)
-
-def install_dependencies():
-    # Change directory to the cloned repo
-    os.chdir('roulette-predictor')
-    # Install dependencies
-    subprocess.run(['pip', 'install', '-r', 'requirements.txt'], check=True)
-
-if __name__ == '__main__':
-    try:
-        print('Forking the repository...')
-        fork_repo()
-        print('Cloning the repository...')
-        clone_repo()
-        print('Installing dependencies...')
-        install_dependencies()
-        print('Setup completed successfully!')
-    except Exception as e:
-        print(f'An error occurred: {e}')
+# Example: List the issues in the repository
+issues = repo.get_issues()
+for issue in issues:
+    print(issue.title)
